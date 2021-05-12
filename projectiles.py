@@ -34,6 +34,7 @@ running = True
 
 global enableTrails
 global bounce
+global collide
 
 def invertBounce():
     global bounce
@@ -47,6 +48,12 @@ def invertTrails():
     trailToggle = tk.Button(gui, text="Trails: " + str(enableTrails), command=lambda : invertTrails())
     trailToggle.grid(row=1, column=1)
 
+def invertCollide():
+    global collide
+    collide = not collide
+    collideToggle = tk.Button(gui, text="Particle Collisions: " + str(collide), command=lambda : invertCollide())
+    collideToggle.grid(row=1, column=2)
+
 def clear():
     global activeProjectiles
     global planets
@@ -56,6 +63,7 @@ def clear():
 
 enableTrails = True
 bounce = False
+collide = False
 
 gravity = tk.Scale(gui, label="Gravity", from_=0, to=15, resolution=0.1, orient="horizontal", length=200)
 gravity.grid(row=0, column=0)
@@ -65,7 +73,7 @@ airResistance = tk.Scale(gui, label="Air Resistance", from_=0, to=1, resolution=
 airResistance.grid(row=0, column=1)
 airResistance.set(0)
 
-collisionEnergyLoss = tk.Scale(gui, label="Collision Energy Loss", from_=0.9, to=5, resolution=0.1, orient="horizontal", length=200)
+collisionEnergyLoss = tk.Scale(gui, label="Bounce Energy Loss", from_=0.9, to=5, resolution=0.1, orient="horizontal", length=200)
 collisionEnergyLoss.grid(row=0, column=2)
 collisionEnergyLoss.set(1.3)
 
@@ -74,6 +82,9 @@ bounceToggle.grid(row=1, column=0)
 
 trailToggle = tk.Button(gui, text="Trails: " + str(enableTrails), command=lambda : invertTrails())
 trailToggle.grid(row=1, column=1)
+
+collideToggle = tk.Button(gui, text="Particle Collisions: " + str(collide), command=lambda : invertCollide())
+collideToggle.grid(row=1, column=2)
 
 clearButton = tk.Button(gui, text="Clear", command=lambda : clear())
 clearButton.grid(row=3, column=0)
@@ -93,6 +104,8 @@ while running:
             invertBounce()
         if event.type == pygame.KEYDOWN and event.key == K_2:
             invertTrails()
+        if event.type == pygame.KEYDOWN and event.key == K_3:
+            invertCollide()
 
     if enableTrails == False:
         window.fill((0,0,0))
@@ -110,6 +123,8 @@ while running:
                 flag = True
                 
         if flag == False:
+            if len(activeProjectiles) > 0 and activeProjectiles[-1].active == False:
+                activeProjectiles.remove(activeProjectiles[-1])
             newProjectile = projectile(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1])
             activeProjectiles.append(newProjectile)
 
@@ -128,7 +143,7 @@ while running:
             proj.velocity[0] -= proj.velocity[0]*airResistance.get()/44.2
             proj.velocity[1] -= proj.velocity[1]*airResistance.get()/44.2
             proj.move()
-            for p in  planets:
+            for p in planets:
                 if p.x > proj.x:
                     x = (p.x - proj.x)
                 else:
@@ -152,17 +167,32 @@ while running:
                     proj.velocity[1] -= forceY
 
                 if r < p.radius:
-                    proj.active = False
+                    activeProjectiles.remove(proj)
+                    p.gravity += 1
                 
             if bounce == True:
-                if proj.x > 800 and proj.velocity[0] > 0:
+                if proj.x >= 798 and proj.velocity[0] > 0:
                     proj.velocity[0] = -(proj.velocity[0]/collisionEnergyLoss.get())
-                elif proj.x < 0 and proj.velocity[0] < 0:
+                elif proj.x <= 0 and proj.velocity[0] < 0:
                     proj.velocity[0] = -(proj.velocity[0]/collisionEnergyLoss.get())
-                if proj.y > 450 and proj.velocity[1] > 0:
+                if proj.y >= 448 and proj.velocity[1] > 0:
                     proj.velocity[1] = -(proj.velocity[1]/collisionEnergyLoss.get())
-                elif proj.y < 27 and proj.velocity[1] < 0:
+                elif proj.y <= 27 and proj.velocity[1] < 0:
                     proj.velocity[1] = -(proj.velocity[1]/collisionEnergyLoss.get())
+
+            if proj.x >= 810 or proj.x <= -10 or proj.y >= 460 or proj.y <= 17:
+                activeProjectiles.remove(proj)
+
+            if collide == True:
+                for proj2 in activeProjectiles:
+                    if proj2 != proj and proj2.active == True:
+                        if proj.x <= proj2.x+2 and proj.x+2 >= proj2.x and proj.y <= proj2.y+2 and proj.y+2 >= proj2.y:
+                            proj.velocity[0] = (proj.velocity[0] + proj2.velocity[0]) / (2)
+                            proj2.velocity[0] = (proj2.velocity[0] + proj.velocity[0]) / (2)
+                            proj.velocity[1] = (proj.velocity[1] + proj2.velocity[1]) / (2)
+                            proj2.velocity[1] = (proj2.velocity[1] + proj.velocity[1]) / (2)
+
+                            
 
             pygame.draw.rect(window, (255,255,255), pygame.Rect(proj.x, proj.y, 2, 2))
 
@@ -183,6 +213,12 @@ while running:
     else:
         trailText = textFont.render("Trails: ON", True, (0,255,0))
     window.blit(trailText, (120, 0))
+
+    if collide == False:
+        collisionText = textFont.render("Particle Collisions: OFF", True, (255,0,0))
+    else:
+        collisionText = textFont.render("Particle Collisions: ON", True, (0,255,0))
+    window.blit(collisionText, (225, 0))
 
     pygame.display.flip()
     pygame.time.Clock().tick(144)
